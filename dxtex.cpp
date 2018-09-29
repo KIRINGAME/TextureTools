@@ -134,6 +134,7 @@ bool CDxtex::OnOpenDDSFile(const char * lpszPathName)
         m_dwHeight = imageinfo2.Height;
         m_dwDepth = 0;
         m_numMips = imageinfo2.MipLevels;
+		m_dwCubeMapFlags = 0;
         break;
 
     case D3DRTYPE_VOLUMETEXTURE:
@@ -148,6 +149,7 @@ bool CDxtex::OnOpenDDSFile(const char * lpszPathName)
         m_dwHeight = imageinfo2.Height;
         m_dwDepth = imageinfo2.Depth;
         m_numMips = imageinfo2.MipLevels;
+		m_dwCubeMapFlags = 0;
         break;
 
     case D3DRTYPE_CUBETEXTURE:
@@ -786,28 +788,13 @@ HRESULT CDxtex::BltAllLevels(D3DCUBEMAP_FACES FaceType,
         }
         else if (IsCubeMap())
         {
-			//if (D3DCUBEMAP_FACE_FORCE_DWORD == FaceType)
-			//{
-			//	for (int i = D3DCUBEMAP_FACE_POSITIVE_X; i <= D3DCUBEMAP_FACE_NEGATIVE_Z; i++)
-			//	{
-			//		LPDIRECT3DSURFACE9 psurfSrc = NULL;
-			//		LPDIRECT3DSURFACE9 psurfDest = NULL;
-			//		hr = pcubetexSrc->GetCubeMapSurface((_D3DCUBEMAP_FACES)i, 0, &psurfSrc);
-			//		hr = pcubetexDest->GetCubeMapSurface((_D3DCUBEMAP_FACES)i, iLevel, &psurfDest);
-			//		hr = D3DXLoadSurfaceFromSurface(psurfDest, NULL, NULL, psurfSrc, NULL, NULL, D3DX_DEFAULT, 0);
-			//		ReleasePpo(&psurfSrc);
-			//		ReleasePpo(&psurfDest);
-			//	}
-			//}
-
-			//LPDIRECT3DSURFACE9 psurfSrc = NULL;
-			//LPDIRECT3DSURFACE9 psurfDest = NULL;
-			//hr = pcubetexSrc->GetCubeMapSurface(FaceType, iOldLevel, &psurfSrc);
-			//hr = pcubetexDest->GetCubeMapSurface(FaceType, iLevel, &psurfDest);
-			//hr = D3DXLoadSurfaceFromSurface(psurfDest, NULL, NULL, psurfSrc, NULL, NULL, D3DX_DEFAULT, 0);
-			//ReleasePpo(&psurfSrc);
-			//ReleasePpo(&psurfDest);
-			return E_FAIL;
+			LPDIRECT3DSURFACE9 psurfSrc = NULL;
+			LPDIRECT3DSURFACE9 psurfDest = NULL;
+			hr = pcubetexSrc->GetCubeMapSurface(FaceType, iOldLevel, &psurfSrc);
+			hr = pcubetexDest->GetCubeMapSurface(FaceType, iLevel, &psurfDest);
+			hr = D3DXLoadSurfaceFromSurface(psurfDest, NULL, NULL, psurfSrc, NULL, NULL, D3DX_DEFAULT, 0);
+			ReleasePpo(&psurfSrc);
+			ReleasePpo(&psurfDest);
         }
         else
         {
