@@ -743,8 +743,7 @@ HRESULT CDxtex::LoadSurfaceFromVolumeSlice(LPDIRECT3DVOLUME9 pVolume, UINT iSlic
 }
 
 
-HRESULT CDxtex::BltAllLevels(D3DCUBEMAP_FACES FaceType, 
-    LPDIRECT3DBASETEXTURE9 ptexSrc, LPDIRECT3DBASETEXTURE9 ptexDest)
+HRESULT CDxtex::BltAllLevels(D3DCUBEMAP_FACES FaceType, LPDIRECT3DBASETEXTURE9 ptexSrc, LPDIRECT3DBASETEXTURE9 ptexDest)
 {
     HRESULT hr;
     LPDIRECT3DTEXTURE9 pmiptexSrc = NULL;
@@ -772,6 +771,7 @@ HRESULT CDxtex::BltAllLevels(D3DCUBEMAP_FACES FaceType,
 	int iOldLevelMax = ptexSrc->GetLevelCount();
 	int iLevelMax = ptexDest->GetLevelCount();
 	int iOldLevel = iOldLevelMax - iLevelMax;
+	iOldLevel = max(0, iOldLevel);
 	int iLevel = 0;
 	for (; iLevel < iLevelMax && iOldLevel < iOldLevelMax; iLevel++, iOldLevel++)
     {
@@ -786,16 +786,32 @@ HRESULT CDxtex::BltAllLevels(D3DCUBEMAP_FACES FaceType,
             ReleasePpo(&pvolSrc);
             ReleasePpo(&pvolDest);
         }
-        else if (IsCubeMap())
-        {
-			LPDIRECT3DSURFACE9 psurfSrc = NULL;
-			LPDIRECT3DSURFACE9 psurfDest = NULL;
-			hr = pcubetexSrc->GetCubeMapSurface(FaceType, iOldLevel, &psurfSrc);
-			hr = pcubetexDest->GetCubeMapSurface(FaceType, iLevel, &psurfDest);
-			hr = D3DXLoadSurfaceFromSurface(psurfDest, NULL, NULL, psurfSrc, NULL, NULL, D3DX_DEFAULT, 0);
-			ReleasePpo(&psurfSrc);
-			ReleasePpo(&psurfDest);
-        }
+		else if (IsCubeMap())
+		{
+			if (D3DCUBEMAP_FACE_FORCE_DWORD == FaceType)
+			{
+				for (int i = D3DCUBEMAP_FACE_POSITIVE_X; i <= D3DCUBEMAP_FACE_NEGATIVE_Z; i++)
+				{
+					LPDIRECT3DSURFACE9 psurfSrc = NULL;
+					LPDIRECT3DSURFACE9 psurfDest = NULL;
+					hr = pcubetexSrc->GetCubeMapSurface((_D3DCUBEMAP_FACES)i, iOldLevel, &psurfSrc);
+					hr = pcubetexDest->GetCubeMapSurface((_D3DCUBEMAP_FACES)i, iLevel, &psurfDest);
+					hr = D3DXLoadSurfaceFromSurface(psurfDest, NULL, NULL, psurfSrc, NULL, NULL, D3DX_DEFAULT, 0);
+					ReleasePpo(&psurfSrc);
+					ReleasePpo(&psurfDest);
+				}
+			}
+			else
+			{
+				LPDIRECT3DSURFACE9 psurfSrc = NULL;
+				LPDIRECT3DSURFACE9 psurfDest = NULL;
+				hr = pcubetexSrc->GetCubeMapSurface(FaceType, iOldLevel, &psurfSrc);
+				hr = pcubetexDest->GetCubeMapSurface(FaceType, iLevel, &psurfDest);
+				hr = D3DXLoadSurfaceFromSurface(psurfDest, NULL, NULL, psurfSrc, NULL, NULL, D3DX_DEFAULT, 0);
+				ReleasePpo(&psurfSrc);
+				ReleasePpo(&psurfDest);
+			}
+		}
         else
         {
             LPDIRECT3DSURFACE9 psurfSrc = NULL;
@@ -812,33 +828,64 @@ HRESULT CDxtex::BltAllLevels(D3DCUBEMAP_FACES FaceType,
     return S_OK;
 }
 
+HRESULT CDxtex::CreatTexture(DWORD dwWidthNew, DWORD dwHeightNew, LPDIRECT3DBASETEXTURE9 Src,LPDIRECT3DBASETEXTURE9* pDes)
+{
+	HRESULT hr;
+	LPDIRECT3DDEVICE9 pd3ddev = GetD3DDev();
+	if (IsVolumeMap())
+	{
+		IDirect3DVolumeTexture9* pvolNew;
+		hr = pd3ddev->CreateVolumeTexture(dwWidthNew, dwHeightNew, 0, 0, 0, GetFormat(Src), D3DPOOL_MANAGED, &pvolNew, NULL);
+		if (FAILED(hr))
+			return hr;
+		*pDes = pvolNew;
+	}
+	else if (IsCubeMap())
+	{
+		IDirect3DCubeTexture9*  pCubeTex;
+		hr = pd3ddev->CreateCubeTexture(dwWidthNew, 0, 0, GetFormat(Src), D3DPOOL_MANAGED, &pCubeTex, NULL);
+		if (FAILED(hr))
+			return hr;
+		*pDes = pCubeTex;
+	}
+	else
+	{
+		IDirect3DTexture9* pTex;
+		hr = pd3ddev->CreateTexture(dwWidthNew, dwHeightNew, 0, 0, GetFormat(Src), D3DPOOL_MANAGED, &pTex, NULL);
+		if (FAILED(hr))
+			return hr;
+		*pDes = pTex;
+	}
+	return hr;
+}
 
 HRESULT CDxtex::Resize(DWORD dwWidthNew, DWORD dwHeightNew)
 {
     HRESULT hr;
-    LPDIRECT3DTEXTURE9 pmiptexNew;
-    LPDIRECT3DDEVICE9 pd3ddev = GetD3DDev();
-	hr = pd3ddev->CreateTexture(dwWidthNew, dwHeightNew, 0, 0, GetFormat(m_ptexOrig), D3DPOOL_MANAGED, &pmiptexNew, NULL);
-    if (FAILED(hr))
-        return hr;
-	hr = BltAllLevels(D3DCUBEMAP_FACE_FORCE_DWORD, m_ptexOrig, pmiptexNew);
-	if (FAILED(hr))
-        return hr;
-    ReleasePpo(&m_ptexOrig);
-    m_ptexOrig = pmiptexNew;
+	LPDIRECT3DBASETEXTURE9 pmiptexNew = nullptr;
+	if (m_ptexOrig != nullptr)
+	{
+		CreatTexture(dwWidthNew, dwHeightNew, m_ptexOrig, &pmiptexNew);
+		hr = BltAllLevels(D3DCUBEMAP_FACE_FORCE_DWORD, m_ptexOrig, pmiptexNew);
+		if (FAILED(hr))
+			return hr;
+		ReleasePpo(&m_ptexOrig);
+		m_ptexOrig = pmiptexNew;
+	}
 
-    if( m_ptexNew != NULL )
+    if( m_ptexNew != nullptr)
     {
-		hr = pd3ddev->CreateTexture(dwWidthNew, dwHeightNew, 0, 0, GetFormat(m_ptexOrig), D3DPOOL_MANAGED, &pmiptexNew, NULL);
-        if (FAILED(hr))
-            return hr;
+		CreatTexture(dwWidthNew, dwHeightNew, m_ptexNew, &pmiptexNew);
 		hr = BltAllLevels(D3DCUBEMAP_FACE_FORCE_DWORD, m_ptexNew, pmiptexNew);
 		if (FAILED(hr))
 			return hr;
         ReleasePpo(&m_ptexNew);
         m_ptexNew = pmiptexNew;
     }
-
+	if (pmiptexNew == nullptr)
+	{
+		return E_FAIL;
+	}
 	m_numMips = pmiptexNew->GetLevelCount();
     m_dwWidth = dwWidthNew;
     m_dwHeight = dwHeightNew;

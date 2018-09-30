@@ -33,6 +33,7 @@ public:
                          LPDIRECT3DBASETEXTURE9* pptexNew);
     HRESULT Compress(D3DFORMAT fmt);
     HRESULT Resize(DWORD dwWidthNew, DWORD dwHeightNew);
+	HRESULT CreatTexture(DWORD dwWidthNew, DWORD dwWidthNewh, LPDIRECT3DBASETEXTURE9 Src, LPDIRECT3DBASETEXTURE9* pDes);
     DWORD NumMips(void);
     LPDIRECT3DBASETEXTURE9 PtexOrig(void) { return m_ptexOrig; }
     LPDIRECT3DBASETEXTURE9 PtexNew(void) { return m_ptexNew; }
